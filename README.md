@@ -520,63 +520,54 @@ Owner-only command to bulk delete or trash all files inside a Google Drive folde
 ## Deployment
 
 <details>
-  <summary><b>Docker Compose (Recommended)</b></summary>
+  <summary><b>Docker Compose on Debian/Ubuntu VPS (SSHX compatible)</b></summary>
 
-### 1. Install Docker & Docker Compose
-Install Docker, Docker Compose plugin, and `nano` editor on Ubuntu/Debian:
+The repository supports both the Compose v2 plugin (`docker compose`) and the legacy Compose v1 binary (`docker-compose`, including 1.29.x). The helper scripts select whichever is installed.
+
+### 1. Clone this repository
 
 ```bash
-sudo apt update && sudo apt install -y docker.io docker-compose-v2 nano
-```
-
-### 2. Clone Repository
-```bash
-git clone https://github.com/aquib4040/AZML.git
+git clone https://github.com/Moviesuploader/AZML.git
 cd AZML
 ```
 
-### 3. Setup Environment Variables (`.env`)
-Create and edit your `.env` file using `nano`. Docker Compose will automatically detect and load this `.env` file upon container startup:
+### 2. Configure secrets privately
 
 ```bash
+cp .env.example .env
 nano .env
+chmod 600 .env
 ```
 
-Paste your required configuration variables (e.g. `BOT_TOKEN`, `TELEGRAM_API`, `TELEGRAM_HASH`, `OWNER_ID`, `DATABASE_URL`):
+Set at least `BOT_TOKEN`, `OWNER_ID`, `TELEGRAM_API`, and `TELEGRAM_HASH`. Add `DATABASE_URL` to enable persistent database-backed settings and task recovery. Do not commit `.env`, `config.env`, Telegram sessions, service-account JSON files, or rclone credentials.
 
-```env
-BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrsTUVwxyZ
-OWNER_ID=123456789
-TELEGRAM_API=123456
-TELEGRAM_HASH=0123456789abcdef0123456789abcdef
-DATABASE_URL=mongodb+srv://...
-```
-*(Press `Ctrl+O` then `Enter` to save, and `Ctrl+X` to exit nano.)*
-
-### 4. Build and Run Container
-Start the bot in detached (background) mode:
+### 3. Run the read-only preflight
 
 ```bash
-docker compose up -d --build
+bash scripts/vps-preflight.sh
 ```
 
-### 5. Container Management Commands
-- **View Live Logs**:
-  ```bash
-  docker compose logs -f
-  ```
-- **Restart Bot**:
-  ```bash
-  docker compose restart
-  ```
-- **Stop Bot**:
-  ```bash
-  docker compose down
-  ```
-- **Update & Rebuild**:
-  ```bash
-  git pull && docker compose up -d --build
-  ```
+This checks Docker, Compose syntax, and required environment keys. It does not start or stop containers.
+
+### 4. Build and start
+
+```bash
+bash scripts/compose.sh build
+bash scripts/compose.sh up -d
+```
+
+The Compose stack uses the isolated container/image names `btmx-azml-app` / `btmx-azml:local`, a loopback-only web port, and dedicated named volumes for downloads, accounts, and qBittorrent state. Review and adapt the port/volume mapping before deploying alongside another instance.
+
+### 5. Container management
+
+```bash
+bash scripts/compose.sh ps
+bash scripts/compose.sh logs --tail=200 -f
+bash scripts/compose.sh restart
+bash scripts/compose.sh stop
+```
+
+To update code, pull the intended GitHub branch and rebuild the image. The container does not reset its working tree to an upstream fork during startup; rebuilds are the deployment/update mechanism. Telegram session files are preserved across restarts.
 
 </details>
 

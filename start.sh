@@ -1,12 +1,18 @@
-#!/bin/bash
-export PORT=${PORT:-85}
+#!/usr/bin/env bash
+set -Eeuo pipefail
 
-rm -f *.session *.session-journal *.session*
+cd "$(dirname "${BASH_SOURCE[0]}")"
+export PORT="${PORT:-85}"
 
-if [ -f .env ]; then
+# Compose injects .env values through env_file. Keep local/Procfile support too.
+if [[ -f .env ]]; then
   set -a
-  source .env
+  # shellcheck disable=SC1091
+  source ./.env
   set +a
 fi
 
-python3 update.py && python3 -m bot
+# Never delete Telegram session files during startup. Session state belongs to
+# the bot owner and must survive restarts and container recreation.
+python3 update.py
+exec python3 -m bot

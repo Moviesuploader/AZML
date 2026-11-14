@@ -5,11 +5,10 @@ from logging import (
     basicConfig,
     error as log_error,
     info as log_info,
+    warning as log_warning,
 )
 from os import path as ospath, environ, remove
-from glob import glob
-from subprocess import run as srun, call as scall
-from importlib.metadata import distributions
+from subprocess import run as srun
 from shutil import which as shutil_which
 import hashlib
 from requests import get as rget
@@ -23,11 +22,7 @@ if ospath.exists("log.txt"):
 if ospath.exists("rlog.txt"):
     remove("rlog.txt")
 
-for f in glob("*.session*"):
-    try:
-        remove(f)
-    except Exception:
-        pass
+# Never delete Telegram session files during a deployment or restart.
 
 basicConfig(
     format="[%(asctime)s] [%(levelname)s] - %(message)s",
@@ -175,64 +170,25 @@ def check_and_update_requirements(req_hash_before=None):
             pass
 
 
-UPGRADE_PACKAGES = environ.get("UPGRADE_PACKAGES", "False")
-if UPGRADE_PACKAGES.lower() == "true":
-    packages = [dist.metadata["Name"] for dist in distributions()]
-    uv_bin = get_uv_path()
-    scall(f'"{uv_bin}" pip install --system --break-system-packages ' + " ".join(packages), shell=True)
-
-UPSTREAM_REPO = environ.get("UPSTREAM_REPO", "")
-if "WZMLakane" in UPSTREAM_REPO or len(UPSTREAM_REPO) == 0:
-    UPSTREAM_REPO = "https://github.com/aquib4040/AZML"
-    UPSTREAM_BRANCH = "main"
-else:
-    UPSTREAM_BRANCH = environ.get("UPSTREAM_BRANCH", "main")
-    if len(UPSTREAM_BRANCH) == 0:
-        UPSTREAM_BRANCH = "main"
-
 req_hash_before = get_file_hash("requirements.txt")
 
-if UPSTREAM_REPO is not None:
-    if "github_pat_" in UPSTREAM_REPO and "@github.com" not in UPSTREAM_REPO:
-        parts = UPSTREAM_REPO.split("github_pat_")
-        if len(parts) == 2 and "/" in parts[1]:
-            token_part, repo_part = parts[1].split("/", 1)
-            UPSTREAM_REPO = f"{parts[0]}github_pat_{token_part}@github.com/{repo_part}"
-    if ospath.exists(".git"):
-        srun(["rm", "-rf", ".git"])
+# Containers are immutable deployments: source updates must happen by rebuilding
+# from the selected GitHub repository and commit, not by resetting the live
+# container's working tree at startup. This also prevents MongoDB settings from
+# silently switching the deployed source to another fork.
+UPSTREAM_REPO = environ.get("UPSTREAM_REPO", "").strip()
+UPSTREAM_BRANCH = environ.get("UPSTREAM_BRANCH", "main").strip() or "main"
 
-    update = srun(
-        [
-            f"git init -q \
-                     && git config --global user.email mdaquibjawed1106@gmial.com \
-                     && git config --global user.name aquib4040 \
-                     && git add . \
-                     && git commit -sm update -q \
-                     && git remote add origin {UPSTREAM_REPO} \
-                     && git fetch origin -q \
-                     && git reset --hard origin/{UPSTREAM_BRANCH} -q"
-        ],
-        shell=True,
+if environ.get("ENABLE_UPSTREAM_UPDATE", "false").strip().lower() == "true":
+    log_warning(
+        "ENABLE_UPSTREAM_UPDATE is ignored in container deployments. "
+        "Pull the intended repository revision and rebuild the image instead."
     )
 
-    repo = UPSTREAM_REPO.split("/")
-    UPSTREAM_REPO = f"https://github.com/{repo[-2]}/{repo[-1]}"
-    if update.returncode == 0:
-        log_info("Successfully updated with latest commits !!")
-        # Log latest commit info
-        try:
-            commit_info = srun(
-                ["git", "log", "--oneline", "-1"],
-                capture_output=True,
-                text=True,
-            ).stdout.strip()
-            log_info(f"Latest commit: {commit_info}")
-        except Exception as e:
-            log_error(f"Failed to get commit info: {e}")
-        check_and_update_requirements(req_hash_before)
-    else:
-        log_error("Something went Wrong ! Retry or Ask Support !")
-    log_info(f"UPSTREAM_REPO: {UPSTREAM_REPO} | UPSTREAM_BRANCH: {UPSTREAM_BRANCH}")
-else:
-    check_and_update_requirements(req_hash_before)
+if environ.get("UPGRADE_PACKAGES", "false").strip().lower() == "true":
+    log_warning(
+        "UPGRADE_PACKAGES is ignored at runtime. Pin and install dependencies "
+        "during the Docker image build to keep deployments reproducible."
+    )
 
+check_and_update_requirements(req_hash_before)

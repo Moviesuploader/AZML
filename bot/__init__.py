@@ -13,7 +13,6 @@ from time import sleep, time
 from subprocess import Popen, run as srun
 from os import remove as osremove, path as ospath, environ, getcwd
 import re
-from glob import glob
 from aria2p import API as ariaAPI, Client as ariaClient
 from qbittorrentapi import Client as qbClient
 from socket import setdefaulttimeout
@@ -55,12 +54,7 @@ getLogger("httpx").setLevel(ERROR)
 
 LOGGER = getLogger(__name__)
 
-# Cleanup any stale/corrupted session files to avoid sqlite schema conflicts
-for _sess in glob("*.session*"):
-    try:
-        osremove(_sess)
-    except Exception:
-        pass
+# Telegram session files are intentionally preserved across restarts.
 
 if ospath.exists("config.env"):
     load_dotenv("config.env", override=False)

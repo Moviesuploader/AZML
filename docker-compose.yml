@@ -1,51 +1,41 @@
 version: "3.3"
 
 services:
-
-  # ==========================
-  # Optional VPN (Gluetun)
-  # ==========================
-  #gluetun:
-  #  image: qmcgaw/gluetun:v3.34
-  #  container_name: gluetun
-  #  cap_add:
-  #    - NET_ADMIN
-  #  devices:
-  #    - /dev/net/tun:/dev/net/tun
-  #  environment:
-  #    - VPN_SERVICE_PROVIDER=
-  #    - VPN_TYPE=
-  #    - OPENVPN_USER=
-  #    - OPENVPN_PASSWORD=
-  #    - WIREGUARD_PRIVATE_KEY=
-  #    - WIREGUARD_ADDRESS=
-  #    - WIREGUARD_PUBLIC_KEY=
-  #    - TZ=Asia/Kolkata
-  #    - UPDATER_PERIOD=24h
-  #  ports:
-  #    - "80:80"
-  #    - "8080:8080"
-  #  restart: unless-stopped
-
-  # ==========================
-  # Main APP (Your Leech Bot)
-  # ==========================
   app:
-    container_name: azml
-    image: azml
-    build: .
+    container_name: btmx-azml-app
+    image: btmx-azml:local
+    build:
+      context: .
+      dockerfile: Dockerfile
     command: bash start.sh
     restart: unless-stopped
+    stop_grace_period: 30s
 
-    # If using Gluetun, uncomment:
-    #network_mode: "service:gluetun"
-
+    # The bot's internal Cloudflare Quick Tunnel uses port 85 in-container.
+    # Keep the optional local web endpoint private and avoid common host ports.
     ports:
-      - "11687:85"
+      - "127.0.0.1:11688:85"
 
     environment:
-      - DOWNLOAD_DIR=/usr/src/app/downloads/
-      - PORT=85
+      DOWNLOAD_DIR: /usr/src/app/downloads/
+      PORT: "85"
+      TZ: Asia/Kolkata
 
     env_file:
       - .env
+
+    volumes:
+      - btmx_azml_downloads:/usr/src/app/downloads
+      - btmx_azml_accounts:/usr/src/app/accounts
+      - btmx_azml_qbittorrent:/usr/src/app/qBittorrent
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  btmx_azml_downloads:
+  btmx_azml_accounts:
+  btmx_azml_qbittorrent:

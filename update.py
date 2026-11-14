@@ -170,6 +170,8 @@ def check_and_update_requirements(req_hash_before=None):
             pass
 
 
+req_hash_before = get_file_hash("requirements.txt")
+
 # Containers are immutable deployments: source updates must happen by rebuilding
 # from the selected GitHub repository and commit, not by resetting the live
 # container's working tree at startup. This also prevents MongoDB settings from

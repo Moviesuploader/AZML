@@ -5,10 +5,10 @@ from logging import (
     basicConfig,
     error as log_error,
     info as log_info,
+    warning as log_warning,
 )
 from os import path as ospath, environ, remove
-from subprocess import run as srun, call as scall
-from importlib.metadata import distributions
+from subprocess import run as srun
 from shutil import which as shutil_which
 import hashlib
 from requests import get as rget
@@ -169,12 +169,6 @@ def check_and_update_requirements(req_hash_before=None):
         except Exception:
             pass
 
-
-UPGRADE_PACKAGES = environ.get("UPGRADE_PACKAGES", "False")
-if UPGRADE_PACKAGES.lower() == "true":
-    packages = [dist.metadata["Name"] for dist in distributions()]
-    uv_bin = get_uv_path()
-    scall(f'"{uv_bin}" pip install --system --break-system-packages ' + " ".join(packages), shell=True)
 
 # Containers are immutable deployments: source updates must happen by rebuilding
 # from the selected GitHub repository and commit, not by resetting the live
